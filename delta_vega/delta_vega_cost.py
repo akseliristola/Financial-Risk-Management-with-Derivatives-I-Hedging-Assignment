@@ -4,12 +4,11 @@ import numpy as np
 import os
 from datetime import datetime
 from pathlib import Path
-from datetime import datetime
 import sys
+
 # Add parent directory to path to import utils
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils import get_implied_volatility, call_greeks
-
 
 strike_prices = [165, 170, 185, 190]
 TRANSACTION_COST_RATE = 0.05  # 5% cost on traded value
@@ -19,6 +18,7 @@ class StrikeType(Enum):
     OTM = "OTM"
     ITM = "ITM"
 
+# Helper Functions
 def calculate_portfolio_weights(delta_bs, vega_bs, delta_rep, vega_rep):
     if vega_rep == 0:
         eta = 0.0
@@ -31,7 +31,7 @@ def calculate_portfolio_weights(delta_bs, vega_bs, delta_rep, vega_rep):
 def get_filename(maturity_str):
     dt = datetime.strptime(maturity_str, "%Y-%m-%d")
     filename_date = f"{dt.year}_{dt.month}_{dt.day}"
-    return f"../data/options_data_{filename_date}.csv"
+    return f"options_data_{filename_date}.csv"
 
 def load_csv_robust(filename):
     paths_to_try = [f"data/{filename}", filename, f"../data/{filename}"]
@@ -43,6 +43,7 @@ def load_csv_robust(filename):
                 continue
     return None
 
+# Main Hedging Logic - Returns MSE and Iterations Count (n)
 def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, maturity_target: str, maturity_rep: str):
     
     #Load & Merge Data
@@ -53,7 +54,7 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
     df_rep = load_csv_robust(filename_rep)
     
     if df_target is None or df_rep is None:
-        return None
+        return None, 0
 
     df_target['Date'] = pd.to_datetime(df_target['Date'])
     df_rep['Date'] = pd.to_datetime(df_rep['Date'])
@@ -61,7 +62,7 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
     df = pd.merge(df_target, df_rep, on=['Date', 'Underlying'], suffixes=('_target', '_rep'))
     
     if df.empty:
-        return None
+        return None, 0
 
     first_row = df.iloc[0]
     S0 = first_row["Underlying"]
@@ -80,9 +81,9 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
     col_rep = f"{option_type}{K}_rep"
     
     if col_target not in df.columns:
-        return None
+        return None, 0
     
-    # 3. Initial Setup
+    # Initial Setup
     t_current = first_row["Date"]
     target_date = datetime.strptime(maturity_target, "%Y-%m-%d")
     rep_date = datetime.strptime(maturity_rep, "%Y-%m-%d")
@@ -109,11 +110,11 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
     
     # Track accumulated values using the just-calculated initial positions
     hedge_portfolio_value = (alpha_curr * S) + (eta_curr * C_rep_market)
-    hedge_portfolio_value = (alpha_curr * S) + (eta_curr * C_rep_market)
     
     A_2_sum = 0
     total_transaction_costs = 0.0
     count = 0
+    n = 1 # Count initial position (for iterations count)
     
     for index, row in df.iloc[1:].iterrows():
         
@@ -167,6 +168,7 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
             # Update State for Next Loop
             alpha_curr = alpha_new
             eta_curr = eta_new
+            n += 1 # Count re-hedging event
             
             # Reset Hedge Portfolio Value for the NEW positions
             hedge_portfolio_value = (alpha_curr * S_curr) + (eta_curr * C_rep_curr)
@@ -184,10 +186,10 @@ def run_simulation_with_costs(interval_days: int, strike_type: StrikeType, matur
         C_rep_market = C_rep_curr
 
     if count == 0:
-        return None
+        return None, n
         
     mse = A_2_sum / count
-    return mse, total_transaction_costs
+    return mse, n
 
 if __name__ == "__main__":
     valid_pairs = [
@@ -196,16 +198,38 @@ if __name__ == "__main__":
         ('2025-10-31', '2025-11-21') 
     ]
     
-    interval_days = [1, 7] # 1 day vs 1 week
+    interval_days_list = [1, 2, 7, 10]
+    brokerage_fee = TRANSACTION_COST_RATE # Set to 0.05 for this file
     
-    print(f"--- Delta-Vega Hedging with {TRANSACTION_COST_RATE*100}% Transaction Costs ---")
+    output_path = "delta_vega_with_cost_raw.csv"
+    records = []
     
-    for interval_day in interval_days:
-        print(f"\n[Re-hedging every {interval_day} day(s)]")
+    print(f"Running Delta-Vega Hedging Simulation (With {brokerage_fee*100}% Cost)...")
+    
+    for interval_day in interval_days_list:
         for strike_type in StrikeType:
             for target_mat, rep_mat in valid_pairs:
-                result = run_simulation_with_costs(interval_day, strike_type, target_mat, rep_mat)
+                mse, iterations = run_simulation_with_costs(
+                    interval_day, 
+                    strike_type, 
+                    target_mat, 
+                    rep_mat
+                )
                 
-                if result:
-                    mse, total_cost = result
-                    print(f"Type: {strike_type.value:3} | Pair: {target_mat}->{rep_mat} | MSE: {mse:.4f} | TotalCost: ${total_cost:.2f}")
+                if mse is not None:
+                    records.append(
+                        {
+                            "maturity": target_mat, 
+                            "interval_days": interval_day,
+                            "strike_type": strike_type.value,
+                            "brokerage_fee": brokerage_fee,
+                            "mse": mse,
+                            "iterations": iterations
+                        }
+                    )
+    
+    # Turn into DataFrame and write CSV
+    df_results = pd.DataFrame(records)
+    df_results.to_csv(output_path, index=False)
+    
+    print(f"Saved {len(df_results)} rows to '{output_path}'.")
