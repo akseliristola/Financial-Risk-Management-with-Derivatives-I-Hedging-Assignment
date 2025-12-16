@@ -1,9 +1,9 @@
 from enum import Enum
 import pandas as pd
-import sys
 import numpy as np
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+import sys
 
 # Add parent directory to path to import utils
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -18,7 +18,7 @@ from utils import (
     gamma_hedging_strike,
 )
 
-brokerage_fees = [0, 0.02] # use for iterating witha and without fees 
+brokerage_fees = [0, 0.05] # use for iterating witha and without fees 
 
 strikes=[165,170,185,190]
 

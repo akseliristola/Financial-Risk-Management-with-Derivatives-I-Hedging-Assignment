@@ -19,19 +19,34 @@ Each strategy is tested across various scenarios to measure hedging effectivenes
 ├── data/                          # Options market data
 │   ├── options_data_2025_9_12.csv
 │   ├── options_data_2025_9_19.csv
-│   └── ...                        # Additional maturity dates
+│   ├── options_data_2025_9_26.csv
+│   ├── options_data_2025_10_10.csv
+│   ├── options_data_2025_10_17.csv
+│   ├── options_data_2025_10_24.csv
+│   ├── options_data_2025_10_31.csv
+│   ├── options_data_2025_11_14.csv
+│   ├── options_data_2025_11_21.csv
+│   └── options_data_2025_11_28.csv
 ├── delta/                         # Delta hedging strategy
 │   ├── delta_heding.py           # Main delta hedging implementation
 │   ├── analyze_hedging_performance.py
-│   └── delta_hedging_performance_*.csv
+│   ├── delta_hedging_performance_raw.csv
+│   └── delta_hedging_performance_summary.csv
 ├── delta_gamma/                   # Delta-Gamma hedging strategy
 │   ├── delta_gamma.py            # Main delta-gamma hedging implementation
 │   ├── analyze_hedging_performance.py
-│   └── gamma_hedging_performance_*.csv
+│   ├── gamma_hedging_performance_raw.csv
+│   └── gamma_hedging_performance_summary.csv
 ├── delta_vega/                    # Delta-Vega hedging strategy
 │   ├── delta_vega_hedge.py       # Delta-Vega hedging without transaction costs
-│   └── delta_vega_cost.py        # Delta-Vega hedging with transaction costs
+│   ├── delta_vega_cost.py        # Delta-Vega hedging with transaction costs
+│   ├── analyze_delta_vega_performance.py
+│   ├── delta_vega_no_cost_raw.csv
+│   ├── delta_vega_with_cost_raw.csv
+│   └── delta_vega_performance_summary.csv
 ├── utils.py                       # Shared utilities (Black-Scholes, Greeks, etc.)
+├── option_ric_tools.py            # Tools for fetching option data from Refinitiv
+└── data_fetching.ipynb            # Jupyter notebook for data collection
 ```
 
 ## Data
@@ -44,6 +59,8 @@ The project uses historical options market data stored in CSV files in the `data
 - **Put Options**: Prices for put options at different strikes (P165, P170, P185, P190, P205)
 
 The data covers multiple maturity dates from September 2025 to November 2025, allowing for testing across different time horizons.
+
+**Data Collection**: The `data_fetching.ipynb` notebook and `option_ric_tools.py` module provide utilities for fetching options market data from Refinitiv Data Platform. The `option_ric_tools.py` module includes functions to construct option RICs (Reuters Instrument Codes) for various exchanges including OPRA, Eurex, HKEX, OSE, and IEU.
 
 ## Hedging Strategies
 
@@ -127,6 +144,8 @@ python delta_vega_hedge.py    # Without transaction costs
 python delta_vega_cost.py      # With transaction costs
 ```
 
+This generates `delta_vega_no_cost_raw.csv` and `delta_vega_with_cost_raw.csv` with MSE results for all parameter combinations.
+
 ## Utilities (`utils.py`)
 
 The `utils.py` module provides shared functionality used by all strategies:
@@ -157,7 +176,12 @@ python analyze_hedging_performance.py
 
 cd delta_gamma
 python analyze_hedging_performance.py
+
+cd delta_vega
+python analyze_delta_vega_performance.py
 ```
+
+The delta-vega analysis script can also analyze both delta-vega results and optionally the original delta hedging results.
 
 ## Key Assumptions
 
@@ -173,6 +197,7 @@ python analyze_hedging_performance.py
 - `pandas` - Data manipulation and CSV handling
 - `numpy` - Numerical computations
 - `scipy` - Statistical functions (normal distribution)
+- `refinitiv.dataplatform` - For fetching market data (used in `option_ric_tools.py` and `data_fetching.ipynb`)
 
 ## Results Interpretation
 

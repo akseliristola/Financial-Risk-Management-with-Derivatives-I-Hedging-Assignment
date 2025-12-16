@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from utils import get_implied_volatility, get_call_option_delta
 
 strike_prices=[165,170,185,190]
+brokerage_fees = [0, 0.05]
 
 def calculate_short_position_value(delta,S):
     return delta*S
@@ -100,7 +101,6 @@ if __name__ == "__main__":
     ]
     
     interval_days_list = [1, 2, 7, 10]
-    brokerage_fees = [0, 0.02]  # use for iterating with and without fees
     
     output_path = "delta_hedging_performance_raw.csv"
     records = []
